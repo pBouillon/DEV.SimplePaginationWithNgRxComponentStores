@@ -36,5 +36,7 @@ export class AppComponent {
 
   onPreviousPage(): void {}
 
-  onNextPage(): void {}
+  onNextPage(): void {
+    this._componentStore.loadNextPage();
+  }
 }
