@@ -1,34 +1,30 @@
-import { inject, Injectable } from "@angular/core";
+import { Injectable } from "@angular/core";
 import {
   ComponentStore,
   OnStoreInit,
   tapResponse
 } from "@ngrx/component-store";
 import { Observable, switchMap, tap, withLatestFrom } from "rxjs";
-import { TodoItem } from "./todo-item";
-import { TodoItemService } from "./todo-item.service";
 
 export interface PaginationDetails {
   offset: number;
   pageSize: number;
 }
 
-export interface PageContent {
-  todoItems: TodoItem[];
+export interface PageContent<TItem> {
+  items: TItem[];
 }
 
-export interface PaginatedItemsState {
+export interface PaginatedItemsState<TItem> {
   paginationDetails: PaginationDetails;
-  pageContent: PageContent;
+  pageContent: PageContent<TItem>;
 }
 
 @Injectable()
-export abstract class PaginatedItemsComponentStore
-  extends ComponentStore<PaginatedItemsState>
+export abstract class PaginatedItemsComponentStore<TItem>
+  extends ComponentStore<PaginatedItemsState<TItem>>
   implements OnStoreInit
 {
-  private readonly _todoItemService = inject(TodoItemService);
-
   ngrxOnStoreInit() {
     this.loadPage();
   }
@@ -55,18 +51,22 @@ export abstract class PaginatedItemsComponentStore
     ({ pageContent }) => pageContent
   );
 
-  readonly selectTodoItems = this.select(
+  readonly selectItems = this.select(
     this.selectPageContent,
-    ({ todoItems }) => todoItems
+    ({ items }) => items
   );
+
+  protected abstract getItems(
+    paginationDetails: PaginationDetails
+  ): Observable<TItem[]>;
 
   readonly loadPage = this.effect((trigger$: Observable<void>) => {
     return trigger$.pipe(
       withLatestFrom(this.selectPaginationDetails),
       switchMap(([, { offset, pageSize }]) =>
-        this._todoItemService.getTodoItems(offset, pageSize).pipe(
+        this.getItems({ offset, pageSize }).pipe(
           tapResponse(
-            (todoItems: TodoItem[]) => this.updatePaginatedItems({ todoItems }),
+            (items: TItem[]) => this.updatePaginatedItems({ items }),
             () => console.error("Something went wrong")
           )
         )
@@ -95,6 +95,6 @@ export abstract class PaginatedItemsComponentStore
   );
 
   private readonly updatePaginatedItems = this.updater(
-    (state, pageContent: PageContent) => ({ ...state, pageContent })
+    (state, pageContent: PageContent<TItem>) => ({ ...state, pageContent })
   );
 }
